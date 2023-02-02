@@ -290,7 +290,9 @@ class SpotifyAPI {
         if (file_exists($directory . $id . '.mp3')) return true;
 
         $command = "python3 -m spotdl --auth-token {$this->token} https://open.spotify.com/track/$id --output $directory{track-id} --bitrate 320k";
-        $status = bash($command);
+        $command = escapeshellcmd($command);
+        exec($command, $output, $status);
+
         return $status === 0;
     }
 }
