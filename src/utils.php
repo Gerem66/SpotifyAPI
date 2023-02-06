@@ -1,6 +1,19 @@
 <?php
 
 /**
+ * @param string $haystack String to search in
+ * @param string $needle String to search
+ * @return bool
+ */
+function str_ends_with($haystack, $needle) {
+    $length = strlen($needle);
+    if ($length == 0) {
+        return true;
+    }
+    return (substr($haystack, -$length) === $needle);
+}
+
+/**
  * @param array $dict Dictionary
  * @param string $cells Chain of keys
  * @return bool

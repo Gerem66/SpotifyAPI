@@ -134,15 +134,16 @@ class SpotifyAPI {
             return false;
         }
         if (curl_errno($ch)) {
-            //echo('Error:' . curl_error($ch)); // TODO: Remove
+            echo('Error:' . curl_error($ch)); // TODO: Remove
             return false;
         }
-        curl_close($ch);
 
         $curlInfo = curl_getinfo($ch);
         if (!checkDict($curlInfo, 'http_code')) {
             return false;
         }
+
+        curl_close($ch);
 
         $status = $curlInfo['http_code'];
         if ($status === 401) {
@@ -278,8 +279,19 @@ class SpotifyAPI {
     }
 
     /**
+     * @param string $artist
+     * @param string $title
+     * @return string|false ID of track or false if not found
+     */
+    function GetIdByName($artist, $title) {
+        $search = $this->Search("$title $artist", 'track', 1, 0, $status);
+        if ($search === false || count($search) === 0) return false;
+        return $search[0]['id'];
+    }
+
+    /**
      * Download track from Spotify (320k bitrate)
-     * @param string $id ID of track and name of file
+     * @param string $id ID of track and mp3 filename
      * @param string $directory Directory to save file
      * @return boolean True if download success or file exists, else false
      */
