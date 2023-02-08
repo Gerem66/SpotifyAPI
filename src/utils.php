@@ -5,12 +5,14 @@
  * @param string $needle String to search
  * @return bool
  */
-function str_ends_with($haystack, $needle) {
-    $length = strlen($needle);
-    if ($length == 0) {
-        return true;
+if (version_compare(PHP_VERSION, '8.0.0', '<')) {
+    function str_ends_with($haystack, $needle) {
+        $length = strlen($needle);
+        if ($length == 0) {
+            return true;
+        }
+        return (substr($haystack, -$length) === $needle);
     }
-    return (substr($haystack, -$length) === $needle);
 }
 
 /**
