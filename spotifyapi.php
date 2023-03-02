@@ -305,7 +305,7 @@ class SpotifyAPI {
         $command = escapeshellcmd($command);
         exec($command, $output, $status);
 
-        return $status === 0;
+        return file_exists($directory . $id . '.mp3') && $status === 0;
     }
 }
 
