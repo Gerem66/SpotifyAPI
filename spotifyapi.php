@@ -208,6 +208,32 @@ class SpotifyAPI {
         return $result;
     }
 
+    function GetAudioAnalysis($trackID, &$status = null) {
+        if ($this->token === false) return false;
+
+        $ch = InitSpotifyCurlWithHeader('bearer', $this->token);
+        if ($ch === false) return false;
+
+        curl_setopt($ch, CURLOPT_URL, "https://api.spotify.com/v1/audio-analysis/$trackID");
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
+
+        $result = curl_exec($ch);
+        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        if (curl_errno($ch)) {
+            return false;
+        }
+        curl_close($ch);
+
+        if ($result === false)
+            return false;
+        $result = json_decode($result, true);
+        if ($result === null || !isset($result['meta']))
+            return false;
+
+        return $result;
+    }
+
     function GetArtistAlbums($artistID, $offset = 0, &$status = null) {
         if ($this->token === false) return false;
 
