@@ -7,7 +7,7 @@ class SpotifyAPI {
     public $token = false;
 
     /** @var string Path to settings file */
-    public $settingsPath = __DIR__ . '/settings.json';
+    public $settingsPath = __DIR__ . '/config.json';
 
     private $settings = array(
         'SPOTIFY_KEY' => '',
