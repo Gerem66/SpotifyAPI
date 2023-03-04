@@ -23,7 +23,9 @@ class SpotifyAPI {
      */
     public function __construct($force = false) {
         $this->LoadSettings();
-        $this->token = $this->GenerateToken($force);
+        if ($this->IsTokenExpired() || $force) {
+            $this->RefreshToken();
+        }
     }
 
     /**
@@ -40,6 +42,8 @@ class SpotifyAPI {
         if ($this->settings === null) {
             throw new Exception("Settings file is invalid\n");
         }
+
+        $this->token = $this->settings['SPOTIFY_TOKEN'];
     }
 
     /**
@@ -51,23 +55,22 @@ class SpotifyAPI {
     }
 
     /**
-     * @param boolean $force Force new token generation
+     * @return bool Token is expired
+     */
+    public function IsTokenExpired() {
+        $tokenIsValide = !empty($this->settings['SPOTIFY_TOKEN']);
+        $tokenCreation = $this->settings['SPOTIFY_TOKEN_CREATION'];
+        $tokenDuration = $this->settings['SPOTIFY_TOKEN_DURATION'];
+        $timeFromLastToken = time() - strtotime($tokenCreation);
+        return !$tokenIsValide || $timeFromLastToken >= $tokenDuration;
+    }
+
+    /**
+     * @param int $status HTTP status code
      * @return string|false Token to executes spotify API requests or false if request failed
      */
-    function GenerateToken($force = false) {
+    public function RefreshToken(&$status = null) {
         $key = $this->settings['SPOTIFY_KEY'];
-
-        // Check if token already exists and not expired
-        if (!$force) {
-            $token = $this->settings['SPOTIFY_TOKEN'];
-            $tokenCreation = $this->settings['SPOTIFY_TOKEN_CREATION'];
-            $tokenDuration = $this->settings['SPOTIFY_TOKEN_DURATION'];
-            $timeFromLastToken = time() - strtotime($tokenCreation);
-            if (!empty($token) && $timeFromLastToken < $tokenDuration) {
-                return $token;
-            }
-        }
-
         $ch = InitSpotifyCurlWithHeader('basic', $key);
         if ($ch === false) return false;
 
@@ -77,8 +80,8 @@ class SpotifyAPI {
         curl_setopt($ch, CURLOPT_POSTFIELDS, 'grant_type=client_credentials');
 
         $result = curl_exec($ch);
+        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         if (curl_errno($ch)) {
-            echo('Error:' . curl_error($ch));
             return false;
         }
         curl_close($ch);
@@ -100,6 +103,7 @@ class SpotifyAPI {
         $this->settings['SPOTIFY_TOKEN_DURATION'] = $duration;
         $this->SaveSettings();
 
+        $this->token = $token;
         return $token;
     }
 
@@ -177,19 +181,46 @@ class SpotifyAPI {
         return $searchResult;
     }
 
-    function GetArtistAlbums($artistID, &$status = null) {
+    function GetTrack($trackID, &$status = null) {
         if ($this->token === false) return false;
 
         $ch = InitSpotifyCurlWithHeader('bearer', $this->token);
         if ($ch === false) return false;
 
-        curl_setopt($ch, CURLOPT_URL, "https://api.spotify.com/v1/artists/$artistID/albums");
+        curl_setopt($ch, CURLOPT_URL, "https://api.spotify.com/v1/tracks/$trackID");
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
 
         $result = curl_exec($ch);
+        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         if (curl_errno($ch)) {
-            //echo 'Error:' . curl_error($ch);
+            return false;
+        }
+        curl_close($ch);
+
+        if ($result === false)
+            return false;
+
+        $result = json_decode($result, true);
+        if ($result === null || !isset($result['id']))
+            return false;
+
+        return $result;
+    }
+
+    function GetArtistAlbums($artistID, $offset = 0, &$status = null) {
+        if ($this->token === false) return false;
+
+        $ch = InitSpotifyCurlWithHeader('bearer', $this->token);
+        if ($ch === false) return false;
+
+        curl_setopt($ch, CURLOPT_URL, "https://api.spotify.com/v1/artists/$artistID/albums?offset=$offset");
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
+
+        $result = curl_exec($ch);
+        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        if (curl_errno($ch)) {
             return false;
         }
         curl_close($ch);
