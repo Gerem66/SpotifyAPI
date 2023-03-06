@@ -66,10 +66,11 @@ class SpotifyAPI {
     }
 
     /**
-     * @param int $status HTTP status code
-     * @return string|false Token to executes spotify API requests or false if request failed
+     * Refresh token and save it to settings file
+     * @param int $http_status HTTP status code
+     * @return string|false Spotify API token or false if request failed
      */
-    public function RefreshToken(&$status = null) {
+    public function RefreshToken(&$http_status = null) {
         $key = $this->settings['SPOTIFY_KEY'];
         $ch = InitSpotifyCurlWithHeader('basic', $key);
         if ($ch === false) return false;
@@ -80,13 +81,13 @@ class SpotifyAPI {
         curl_setopt($ch, CURLOPT_POSTFIELDS, 'grant_type=client_credentials');
 
         $result = curl_exec($ch);
-        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        if (curl_errno($ch)) {
-            return false;
-        }
+        $http_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        if ($result === false) return false;
+        if ($http_status !== 200 || $result === false) {
+            return false;
+        }
+
         $result = json_decode($result, true);
         $containsValues = isset($result['access_token'], $result['expires_in']);
         if ($result === null || !$containsValues) {
@@ -112,10 +113,10 @@ class SpotifyAPI {
      * @param 'album'|'artist'|'playlist'|'track'|'show'|'episode'|'audiobook' $type
      * @param int $limit Limit of result
      * @param int $offset
-     * @param int $status Status of HTTP request
+     * @param int $http_status Status of HTTP request
      * @return mixed|false URL of artist's spotify page or false if request failed
      */
-    function Search($search, $type = 'artist', $limit = 10, $offset = 0, &$status = null) {
+    function Search($search, $type = 'artist', $limit = 10, $offset = 0, &$http_status = null) {
         if ($this->token === false) return false;
 
         $ch = InitSpotifyCurlWithHeader('bearer', $this->token);
@@ -133,45 +134,34 @@ class SpotifyAPI {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
 
-        $curlResult = curl_exec($ch);
-        if ($curlResult === false) {
-            return false;
-        }
-        if (curl_errno($ch)) {
-            echo('Error:' . curl_error($ch)); // TODO: Remove
-            return false;
-        }
-
-        $curlInfo = curl_getinfo($ch);
-        if (!checkDict($curlInfo, 'http_code')) {
-            return false;
-        }
-
+        $result = curl_exec($ch);
+        $http_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        $status = $curlInfo['http_code'];
-        if ($status === 401) {
-            // Bad token or token expired
+        if ($http_status === 401) {
+            // Bad token or token expired: refresh token and retry
+            if ($this->IsTokenExpired() && $this->RefreshToken() !== false) {
+                return $this->Search($search, $type, $limit, $offset, $http_status);
+            }
             return false;
         }
-        else if ($status === 403) {
-            // Bad OAuth request (wrong consumer key, bad nonce, expired timestamp...)
-            return false;
-        }
-        else if ($status === 429) {
-            // The app has exceeded its rate limits
-            return false;
-        }
-        else if ($status !== 200) {
-            // Other errors (400 ?)
+        else if ($http_status !== 200) {
+            // [403] Bad OAuth request (wrong consumer key, bad nonce, expired timestamp...)
+            // [429] The app has exceeded its rate limits
+            // [Other] 4xx ?
             return false;
         }
 
-        $searchResult = json_decode($curlResult, true);
-        if ($searchResult === NULL || !checkDict($searchResult, "{$type}s", 'items'))
+        if ($result === false) {
             return false;
+        }
+
+        $searchResult = json_decode($result, true);
+        if ($searchResult === null || !checkDict($searchResult, "{$type}s", 'items')) {
+            return false;
+        }
+
         $searchResult = $searchResult["{$type}s"]['items'];
-
         if ($limit > $limitMax && count($searchResult) === $limitMax) {
             $next = $this->Search($search, $type, $limit - $limitMax, $offset + $limitMax);
             if ($next === false) return [];
@@ -181,7 +171,7 @@ class SpotifyAPI {
         return $searchResult;
     }
 
-    function GetTrack($trackID, &$status = null) {
+    function GetTrack($trackID, &$http_status = null) {
         if ($this->token === false) return false;
 
         $ch = InitSpotifyCurlWithHeader('bearer', $this->token);
@@ -192,23 +182,22 @@ class SpotifyAPI {
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
 
         $result = curl_exec($ch);
-        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        if (curl_errno($ch)) {
-            return false;
-        }
+        $http_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        if ($result === false)
+        if ($http_status !== 200 || $result === false) {
             return false;
+        }
 
         $result = json_decode($result, true);
-        if ($result === null || !isset($result['id']))
+        if ($result === null || !isset($result['id'])) {
             return false;
+        }
 
         return $result;
     }
 
-    function GetAudioAnalysis($trackID, &$status = null) {
+    function GetAudioAnalysis($trackID, &$http_status = null) {
         if ($this->token === false) return false;
 
         $ch = InitSpotifyCurlWithHeader('bearer', $this->token);
@@ -219,22 +208,22 @@ class SpotifyAPI {
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
 
         $result = curl_exec($ch);
-        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        if (curl_errno($ch)) {
-            return false;
-        }
+        $http_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        if ($result === false)
+        if ($http_status !== 200 || $result === false) {
             return false;
+        }
+
         $result = json_decode($result, true);
-        if ($result === null || !isset($result['meta']))
+        if ($result === null || !isset($result['meta'])) {
             return false;
+        }
 
         return $result;
     }
 
-    function GetArtistAlbums($artistID, $offset = 0, &$status = null) {
+    function GetArtistAlbums($artistID, $offset = 0, &$http_status = null) {
         if ($this->token === false) return false;
 
         $ch = InitSpotifyCurlWithHeader('bearer', $this->token);
@@ -245,22 +234,18 @@ class SpotifyAPI {
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
 
         $result = curl_exec($ch);
-        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        if (curl_errno($ch)) {
-            return false;
-        }
+        $http_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        if ($result === false)
+        if ($http_status !== 200 || $result === false) {
             return false;
-        $result = json_decode($result, true);
-        //if ($result === null || !isset($result['albums']))
-        //    return false;
+        }
 
+        $result = json_decode($result, true);
         return $result;
     }
 
-    function GetAlbumTracks($albumIDs, &$status = null) {
+    function GetAlbumTracks($albumIDs, &$http_status = null) {
         if ($this->token === false) return false;
 
         $ch = InitSpotifyCurlWithHeader('bearer', $this->token);
@@ -272,27 +257,27 @@ class SpotifyAPI {
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
 
         $result = curl_exec($ch);
-        if (curl_errno($ch)) {
-            //echo 'Error:' . curl_error($ch);
-            return false;
-        }
+        $http_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        if ($result === false)
+        if ($http_status !== 200 || $result === false) {
             return false;
+        }
+
         $result = json_decode($result, true);
-        if ($result === null || !isset($result['albums']))
+        if ($result === null || !isset($result['albums'])) {
             return false;
+        }
 
         return $result['albums'];
     }
 
     /**
      * @param string[] $IDs
-     * @param int $status Status of HTTP request
+     * @param int $http_status Status of HTTP request
      * @return mixed|false URL of artist's spotify page or false if request failed
      */
-    function GetAudioFeature($IDs, &$status = null) {
+    function GetAudioFeature($IDs, &$http_status = null) {
         if ($this->token === false) return false;
 
         $ch = InitSpotifyCurlWithHeader('bearer', $this->token);
@@ -304,35 +289,25 @@ class SpotifyAPI {
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
 
         $result = curl_exec($ch);
-        if (curl_errno($ch)) {
-            //echo 'Error:' . curl_error($ch);
-            return false;
-        }
+        $http_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        $curlInfo = curl_getinfo($ch);
-        if (!checkDict($curlInfo, 'http_code'))
-            return false;
-
-        $status = $curlInfo['http_code'];
-        if ($status === 401) {
+        if ($http_status === 401) {
             // Bad token or token expired
+            if ($this->IsTokenExpired() && $this->RefreshToken() !== false) {
+                return $this->GetAudioFeature($IDs, $http_status);
+            }
             return false;
         }
-        if ($status === 403) {
-            // Bad OAuth request (wrong consumer key, bad nonce, expired timestamp...)
-            return false;
-        }
-        if ($status === 429) {
-            // The app has exceeded its rate limits
+        else if ($http_status !== 200 || $result === false) {
             return false;
         }
 
-        $audioFeatures = json_decode($result, true);
-        if ($audioFeatures === null || !checkDict($audioFeatures, 'audio_features'))
+        $audio_features = json_decode($result, true);
+        if ($audio_features === null || !checkDict($audio_features, 'audio_features'))
             return false;
 
-        return $audioFeatures['audio_features'];
+        return $audio_features['audio_features'];
     }
 
     /**
@@ -340,8 +315,8 @@ class SpotifyAPI {
      * @param string $title
      * @return string|false ID of track or false if not found
      */
-    function GetIdByName($artist, $title) {
-        $search = $this->Search("$title $artist", 'track', 1, 0, $status);
+    function GetTrackIdByName($artist, $title) {
+        $search = $this->Search("$title $artist", 'track', 1, 0, $http_status);
         if ($search === false || count($search) === 0) return false;
         return $search[0]['id'];
     }
@@ -352,7 +327,7 @@ class SpotifyAPI {
      * @param string $directory Directory to save file
      * @return boolean True if download success or file exists, else false
      */
-    function Download($id, $directory = './') {
+    function DownloadTrack($id, $directory = './') {
         if (!str_ends_with($directory, '/')) $directory .= '/';
 
         if ($this->token === false) return false;

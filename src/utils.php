@@ -1,6 +1,7 @@
 <?php
 
 /**
+ * Create own 'str_ends_with' function if not exists
  * @param string $haystack String to search in
  * @param string $needle String to search
  * @return bool
@@ -30,27 +31,27 @@ function checkDict($dict, ...$cells) {
 }
 
 /**
- * @param 'basic'|'bearer' $authType Authorization type
- * @param string $tokenOrKey Spotify token or key (use for get token)
+ * @param 'basic'|'bearer' $auth_type Authorization type
+ * @param string $token_or_key Spotify key (with basic auth, used for get token) or token (with bearer auth)
  * @return \CurlHandle|false
  */
-function InitSpotifyCurlWithHeader($authType, $tokenOrKey) {
-    $ch = curl_init();
-    if ($ch === false) return false;
-
+function InitSpotifyCurlWithHeader($auth_type, $token_or_key) {
     $headers = array();
-    if ($authType === 'basic') {
-        $headers[] = "Authorization: Basic {$tokenOrKey}"; // Key
+    if ($auth_type === 'basic') {
+        $headers[] = "Authorization: Basic {$token_or_key}"; // Key
         $headers[] = 'Content-Type: application/x-www-form-urlencoded';
-    } else if ($authType === 'bearer') {
+    } else if ($auth_type === 'bearer') {
         $headers[] = 'Accept: application/json';
         $headers[] = 'Content-Type: application/json';
-        $headers[] = "Authorization: Bearer {$tokenOrKey}"; // Token
+        $headers[] = "Authorization: Bearer {$token_or_key}"; // Token
     } else {
         return false;
     }
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
+    $ch = curl_init();
+    if ($ch === false) return false;
+
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     return $ch;
 }
 
