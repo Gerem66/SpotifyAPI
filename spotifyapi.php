@@ -322,6 +322,37 @@ class SpotifyAPI {
     }
 
     /**
+     * @param string $artist
+     * @param string $title
+     * @return array|false Audio features of track or false if not found
+     */
+    function GetArtistTopTracks($artistID, $country = 'US', &$http_status = null) {
+        if ($this->token === false) return false;
+
+        $ch = InitSpotifyCurlWithHeader('bearer', $this->token);
+        if ($ch === false) return false;
+
+        curl_setopt($ch, CURLOPT_URL, "https://api.spotify.com/v1/artists/$artistID/top-tracks?country=$country");
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
+
+        $result = curl_exec($ch);
+        $http_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($http_status !== 200 || $result === false) {
+            return false;
+        }
+
+        $result = json_decode($result, true);
+        if ($result === null || !isset($result['tracks'])) {
+            return false;
+        }
+
+        return $result['tracks'];
+    }
+
+    /**
      * Download track from Spotify (320k bitrate)
      * @param string $id ID of track and mp3 filename
      * @param string $directory Directory to save file
