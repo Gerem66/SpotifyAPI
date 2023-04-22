@@ -62,7 +62,7 @@ class SpotifyAPI {
         $tokenCreation = $this->settings['SPOTIFY_TOKEN_CREATION'];
         $tokenDuration = $this->settings['SPOTIFY_TOKEN_DURATION'];
         $timeFromLastToken = time() - strtotime($tokenCreation);
-        return !$tokenIsValide || $timeFromLastToken >= $tokenDuration;
+        return !$tokenIsValide || $timeFromLastToken >= $tokenDuration - 300; // 5 minutes before expiration
     }
 
     /**
