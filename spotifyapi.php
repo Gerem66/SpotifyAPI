@@ -171,6 +171,32 @@ class SpotifyAPI {
         return $searchResult;
     }
 
+    function GetArtistByID($artistID, &$http_status = null) {
+        if ($this->token === false) return false;
+
+        $ch = InitSpotifyCurlWithHeader('bearer', $this->token);
+        if ($ch === false) return false;
+
+        curl_setopt($ch, CURLOPT_URL, "https://api.spotify.com/v1/artists/$artistID");
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
+
+        $result = curl_exec($ch);
+        $http_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($http_status !== 200 || $result === false) {
+            return false;
+        }
+
+        $result = json_decode($result, true);
+        if ($result === null || !isset($result['id'])) {
+            return false;
+        }
+
+        return $result;
+    }
+
     function GetTrack($trackID, &$http_status = null) {
         if ($this->token === false) return false;
 
